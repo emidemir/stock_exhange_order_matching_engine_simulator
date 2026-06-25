@@ -54,20 +54,58 @@ class OrderBook:
                 
         return None
 
+    def _aggregate_by_price(self, orders, limit):
+        """
+        Collapses individual resting orders into Level 2-style price levels:
+        one row per price, with the remaining (unfilled) quantity summed
+        across every order sitting at that price.
+
+        Relies on `orders` already being sorted best-price-first, so the
+        first time a price is seen is also its correct rank in the book.
+        """
+        levels = {}
+        for o in orders:
+            level = levels.setdefault(o.price, {
+                'price': o.price,
+                'quantity': 0,
+                'order_count': 0,
+            })
+            # Use remaining_quantity, not the original quantity — a
+            # PARTIAL order should only show what's actually still resting.
+            level['quantity'] += o.remaining_quantity
+            level['order_count'] += 1
+
+        return list(levels.values())[:limit]
+
+    def _calc_spread(self, bids, asks):
+        if not bids or not asks:
+            return None
+
+        best_bid = bids[0]['price']
+        best_ask = asks[0]['price']
+        spread = best_ask - best_bid
+        mid = (best_ask + best_bid) / 2
+
+        return {
+            'amount': spread,
+            'percent': (spread / mid * 100) if mid else 0,
+            'best_bid': best_bid,
+            'best_ask': best_ask,
+        }
+
     def get_depth(self, limit=10):
         """
-        Returns a dictionary representation of the book for the frontend/API.
-        Example: {'bids': [{'price': 100, 'qty': 50}], 'asks': [...]}
+        Returns a dictionary representation of the book for the frontend/API,
+        aggregated into price levels the way a real Level 2 book is shown —
+        not as one row per individual resting order.
+        Example: {'bids': [{'price': 100, 'quantity': 50, 'order_count': 2}], 'asks': [...]}
         """
-        # Helper to format list
-        def format_orders(orders):
-            return [
-                {'price': o.price, 'quantity': o.quantity, 'id': o.id} 
-                for o in orders[:limit]
-            ]
+        bids = self._aggregate_by_price(self.get_bids(), limit)
+        asks = self._aggregate_by_price(self.get_asks(), limit)
 
         return {
             'stock': self.stock.ticker,
-            'bids': format_orders(self.get_bids()),
-            'asks': format_orders(self.get_asks())
+            'bids': bids,
+            'asks': asks,
+            'spread': self._calc_spread(bids, asks),
         }
