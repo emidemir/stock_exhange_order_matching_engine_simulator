@@ -4,7 +4,7 @@ import './App.css';
 import StockList from './components/StockList';
 import OrderBook from './components/OrderBook';
 import UserList from './components/UserList';
-import EventControls from './components/EventControls';
+import EventControls from './components/EventControl';
 
 function App() {
   const [selectedTicker, setSelectedTicker] = useState(null);
