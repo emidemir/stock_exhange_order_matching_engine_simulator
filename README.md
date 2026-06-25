@@ -225,7 +225,7 @@ A `MarketEvent` is just `{title, target_industry, sentiment_score, is_active}`. 
    docker compose exec web python manage.py reset_simulation
    ```
 
-5. **Before the frontend will compile**, fix the import bug described in [Known issues](#known-issues--limitations). Then open:
+5. **Links:
    - Dashboard — http://localhost:3000
    - API root — http://localhost:8000/api/
    - Swagger UI — http://localhost:8000/api/schema/swagger-ui/

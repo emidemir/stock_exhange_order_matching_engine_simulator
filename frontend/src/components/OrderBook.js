@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api';
 
 const OrderBook = ({ ticker }) => {
-    const [book, setBook] = useState({ bids: [], asks: [] });
+    const [book, setBook] = useState({ bids: [], asks: [], spread: null });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -32,49 +32,65 @@ const OrderBook = ({ ticker }) => {
     if (!ticker) return <div style={{ padding: 20, color: '#888' }}>Select a stock to view the Order Book</div>;
     if (loading) return <div style={{ padding: 20 }}>Loading Book...</div>;
 
-    // Helper to render a list of orders
-    const renderRows = (orders, type) => {
-        // Reverse asks so the lowest sell price is at the bottom (closest to the spread)
-        const displayOrders = type === 'ask' ? [...orders].reverse() : orders;
-        
-        return displayOrders.map((order) => (
-            <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #222' }}>
-                <span style={{ width: '33%', textAlign: 'left', color: '#aaa' }}>{order.quantity}</span>
-                <span style={{ 
-                    width: '33%', 
-                    textAlign: 'right', 
-                    fontWeight: 'bold', 
-                    color: type === 'bid' ? '#4caf50' : '#f44336' // Green for Bids, Red for Asks
-                }}>
-                    {order.price}
-                </span>
-            </div>
-        ));
+    // Each side is scaled against its own deepest level, so the bars stay
+    // meaningful even when bids and asks have very different total size.
+    const maxBidQty = Math.max(1, ...book.bids.map((l) => l.quantity));
+    const maxAskQty = Math.max(1, ...book.asks.map((l) => l.quantity));
+
+    // One row per aggregated price level (not one row per individual order).
+    const renderRows = (levels, side, maxQty) => {
+        const displayLevels = side === 'ask' ? [...levels].reverse() : levels;
+
+        return displayLevels.map((level) => {
+            const price = Number(level.price);
+            const pct = maxQty > 0 ? Math.min(100, (level.quantity / maxQty) * 100) : 0;
+            const title = `${level.order_count} order${level.order_count > 1 ? 's' : ''} at $${price.toFixed(2)}`;
+
+            return (
+                <div className="book-row" key={`${side}-${level.price}`} title={title}>
+                    <div className={`depth-bar depth-bar-${side}`} style={{ width: `${pct}%` }} />
+                    <span className="book-qty">{level.quantity}</span>
+                    <span className={`book-price book-price-${side}`}>{price.toFixed(2)}</span>
+                </div>
+            );
+        });
     };
 
+    const spread = book.spread;
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Header / Spread */}
-            <div style={{ padding: '10px 20px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                <span style={{ color: '#888' }}>QTY</span>
-                <span style={{ color: '#888' }}>PRICE</span>
+        <div className="order-book">
+            {/* Header */}
+            <div className="book-header-row">
+                <span>QTY</span>
+                <span>PRICE</span>
             </div>
 
-            {/* ASKS (Sellers) - Top Half */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                {renderRows(book.asks, 'ask')}
-                {book.asks.length === 0 && <div style={{textAlign: 'center', color: '#444'}}>No Sellers</div>}
+            {/* ASKS (Sellers) — worst price at top, best (lowest) right above the spread */}
+            <div>
+                {book.asks.length === 0
+                    ? <div className="book-empty">No sellers</div>
+                    : renderRows(book.asks, 'ask', maxAskQty)}
             </div>
 
-            {/* The Spread (Gap) */}
-            <div style={{ padding: '5px', backgroundColor: '#263238', textAlign: 'center', fontSize: '0.8rem', color: '#bbb', letterSpacing: '1px' }}>
-                SPREAD
+            {/* Spread */}
+            <div className="book-spread">
+                {spread ? (
+                    <>
+                        <span className="book-spread-label">SPREAD</span>
+                        <span className="book-spread-amount">${Number(spread.amount).toFixed(2)}</span>
+                        <span className="book-spread-pct">({Number(spread.percent).toFixed(2)}%)</span>
+                    </>
+                ) : (
+                    <span className="book-spread-label">SPREAD</span>
+                )}
             </div>
 
-            {/* BIDS (Buyers) - Bottom Half */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px' }}>
-                {book.bids.length === 0 && <div style={{textAlign: 'center', color: '#444'}}>No Buyers</div>}
-                {renderRows(book.bids, 'bid')}
+            {/* BIDS (Buyers) — best (highest) price at top */}
+            <div>
+                {book.bids.length === 0
+                    ? <div className="book-empty">No buyers</div>
+                    : renderRows(book.bids, 'bid', maxBidQty)}
             </div>
         </div>
     );

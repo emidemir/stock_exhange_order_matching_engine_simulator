@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './App.css';
 
 import StockList from './components/StockList';
+import StockChart from './components/StockChart';
 import OrderBook from './components/OrderBook';
 import UserList from './components/UserList';
 import EventControls from './components/EventControl';
@@ -11,24 +12,31 @@ function App() {
 
   return (
     <div className="dashboard-container">
-      
+
       {/* COLUMN 1: Stocks */}
       <div className="panel">
         <div className="panel-header">Market Watch</div>
         <StockList onSelect={setSelectedTicker} />
       </div>
 
-      {/* COLUMN 2: Order Book */}
-      <div className="panel">
+      {/* COLUMN 2: Chart + Order Book */}
+      <div className="panel book-panel">
         <div className="panel-header">
           {selectedTicker ? `Order Book: ${selectedTicker}` : 'Order Book'}
         </div>
-        <OrderBook ticker={selectedTicker} />
+
+        <div className="chart-wrap">
+          <StockChart ticker={selectedTicker} />
+        </div>
+
+        <div className="book-wrap">
+          <OrderBook ticker={selectedTicker} />
+        </div>
       </div>
 
       {/* COLUMN 3: Users & Events */}
       <div className="right-column">
-        
+
         {/* Top Half: Users */}
         <div className="sub-panel">
           <div className="panel-header">Market Participants</div>
